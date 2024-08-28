@@ -3,6 +3,7 @@ const fs = require("fs");
 const app = express();
 const Firebird = require("node-firebird");
 const { tables } = require("./tables.js");
+
 var options = {};
 options.host = "0.tcp.ap.ngrok.io";
 options.port = 13012;
@@ -27,12 +28,13 @@ function writeToFile(filename, data) {
   });
 }
 
-function getData(tableName) {
+function getData(tableName, callback) {
   Firebird.attach(options, function (err, db) {
     if (err) {
       console.error("Connection Pool Error:", err);
-      return;
+      return callback(err);
     }
+
     db.query(`SELECT * FROM ${tableName};`, function (err, result) {
       if (err) {
         console.error(`Error fetching data from table ${tableName}:`, err);
@@ -51,12 +53,42 @@ function getData(tableName) {
       writeToFile(`./tables/${tableName}.json`, JSON.stringify(formattedResult));
 
       db.detach();
+      callback(null);
     });
   });
 }
 
-tables.forEach((table) => {
-  getData(table);
+function processTables(tables, callback) {
+  let index = 0;
+
+  function processNext() {
+    if (index < tables.length) {
+      getData(tables[index], (err) => {
+        if (err) {
+          console.error(`Failed to process table: ${tables[index]}`);
+          return callback(err);
+        }
+        index++;
+        processNext();
+      });
+    } else {
+      callback(null); // All tables processed
+    }
+  }
+
+  processNext();
+}
+
+processTables(tables, (err) => {
+  if (err) {
+    console.error("An error occurred during processing:", err);
+  } else {
+    console.log("All tables processed successfully.");
+  }
+  
+  // Tutup server setelah semua operasi selesai
+  console.log("Shutting down the server...");
+  process.exit(0);
 });
 
 app.listen(3000, () => {
