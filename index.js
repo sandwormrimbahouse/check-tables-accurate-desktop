@@ -49,6 +49,8 @@ function getData(tableName) {
       });
 
       writeToFile(`./tables/${tableName}.json`, JSON.stringify(formattedResult));
+
+      db.detach();
     });
   });
 }
